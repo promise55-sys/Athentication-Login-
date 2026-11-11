@@ -79,11 +79,7 @@ function localizedCountryName(code, fallback) {
 }
 
 const heroPromoVideos = [
-	{ id: 'lwVRB-afOqg', title: 'Nkyinkyim Xperience 2025', channel: 'Nkyinkyim Band', category: 'Gospel concert', description: 'A festival-scale gospel celebration from Nkyinkyim Band.' },
-	{ id: 'MrWEWiZDx9Q', title: 'The Praise · Live', channel: 'Diana Hamilton Official', category: 'Praise and worship', description: 'Join Diana Hamilton for an energetic live praise moment.' },
-	{ id: 'iDQ4TFhQ2iU', title: 'Spirit Of Praise 7', channel: 'Spirit Network', category: 'Gospel ensemble', description: 'A collective worship performance from the Spirit Of Praise series.' },
-	{ id: 'gIWCDgNt5ww', title: 'Full Worship Set · Live', channel: 'Worship Together', category: 'Worship set', description: 'Settle into a full worship session and sing along.' },
-	{ id: 'FwU99s4pfzA', title: 'The Iconic Live Experience', channel: 'The Icons Music', category: 'Live experience', description: 'A concert-stage performance centered on the energy of The Icons.' },
+	{ title: 'Featured gospel concert', channel: 'Musicians World', category: 'Offline concert video', description: 'Watch the locally hosted live concert video, even when you are offline.' },
 ];
 
 function initializeHeroPromoCarousel() {
@@ -98,10 +94,9 @@ function initializeHeroPromoCarousel() {
 		const preview = document.createElement('button');
 		preview.className = 'hero-promo-preview';
 		preview.type = 'button';
-		preview.setAttribute('aria-label', `Play ${promo.title} by ${promo.channel}`);
-		preview.dataset.videoId = promo.id;
+		preview.setAttribute('aria-label', `Play ${promo.title}`);
 		const thumbnail = document.createElement('img');
-		thumbnail.src = `https://i.ytimg.com/vi/${promo.id}/hqdefault.jpg`;
+		thumbnail.src = '/assets/live-stage-poster.jpg';
 		thumbnail.alt = '';
 		thumbnail.loading = 'lazy';
 		thumbnail.decoding = 'async';
@@ -124,40 +119,46 @@ function initializeHeroPromoCarousel() {
 		details.append(watch);
 		list.append(card);
 		const startPlayback = () => {
-			const player = document.createElement('iframe');
+			const player = document.createElement('video');
 			player.className = 'hero-promo-player';
-			player.title = `Watch ${promo.title} by ${promo.channel}`;
-			player.loading = 'lazy';
-			player.referrerPolicy = 'strict-origin-when-cross-origin';
-			player.allow = 'autoplay; encrypted-media; picture-in-picture; web-share';
-			player.allowFullscreen = true;
-			player.src = `https://www.youtube-nocookie.com/embed/${promo.id}?autoplay=1&playsinline=1&rel=0`;
+			player.title = `Watch ${promo.title}`;
+			player.src = '/assets/live-stage.mp4';
+			player.poster = '/assets/live-stage-poster.jpg';
+			player.controls = true;
+			player.playsInline = true;
+			player.autoplay = true;
+			player.preload = 'metadata';
 			preview.replaceWith(player);
 			watch.disabled = true;
-			watch.textContent = 'Player opened';
+			watch.textContent = 'Video opened';
 		};
 		preview.addEventListener('click', startPlayback, { once: true });
 		watch.addEventListener('click', startPlayback, { once: true });
 	}
 	for (const [id, direction] of [['heroPromoPrevious', -1], ['heroPromoNext', 1]]) {
-		byId(id)?.addEventListener('click', () => {
+		const button = byId(id);
+		if (button) button.disabled = list.children.length < 2;
+		button?.addEventListener('click', () => {
 			const card = list.querySelector('.hero-promo-card');
 			list.scrollBy({ left: direction * (card?.getBoundingClientRect().width || list.clientWidth), behavior: 'smooth' });
 		});
 	}
-	const revealPromos = () => {
-		if (video.dataset.promoShown === 'true') return;
-		video.dataset.promoShown = 'true';
+	byId('heroVideoSkip')?.addEventListener('click', () => {
 		video.pause();
-		const skip = byId('heroVideoSkip');
-		if (skip) skip.hidden = true;
-	};
-	video.addEventListener('ended', revealPromos, { once: true });
-	video.addEventListener('error', revealPromos, { once: true });
-	byId('heroVideoSkip')?.addEventListener('click', revealPromos);
+		byId('heroPromoCarousel')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+	});
 }
 
 initializeHeroPromoCarousel();
+
+function activateHeroVideo() {
+	const video = byId('heroLiveVideo');
+	if (!video || document.hidden || !appView || appView.hidden || byId('community')?.hidden) return;
+	video.muted = true;
+	video.loop = true;
+	const playback = video.play();
+	if (playback) playback.catch(() => { video.controls = true; });
+}
 
 function initializeConcertGallery() {
 	const gallery = byId('concertGalleryTrack');
@@ -279,7 +280,24 @@ const musicQuotes = [
 	'Every voice carries a world; together, we make a song.',
 	'One shared rhythm can make strangers feel like family.',
 	'Keep creating. Somewhere, your next song is already finding its people.',
+	'A song can travel farther than the person who first imagined it.',
+	'Practice is a quiet promise to the music you have not made yet.',
+	'The best collaborations begin with curiosity and a little courage.',
+	'Every instrument has a story. Playing together lets those stories meet.',
+	'Create the sound you wish you could hear in the world.',
+	'A melody can make a new place feel familiar.',
+	'Your next favorite sound may come from someone you have not met.',
+	'Music grows brighter when we make room for every voice.',
+	'An imperfect first note is still the start of a song.',
+	'Some bridges are built one chorus at a time.',
+	'Share what you make; someone out there needs to hear it.',
+	'The stage is bigger when we invite each other onto it.',
+	'Rhythm reminds us that different parts can move as one.',
+	'Make time for the music that makes you feel more like yourself.',
 ];
+
+let musicQuoteTimer = null;
+let advanceMusicQuote = () => {};
 
 function initializeMusicQuote() {
 	const popup = byId('musicQuotePopup');
@@ -287,14 +305,46 @@ function initializeMusicQuote() {
 	if (!popup || !quote || popup.dataset.initialized) return;
 	popup.dataset.initialized = 'true';
 	let index = Math.floor(Math.random() * musicQuotes.length);
-	const renderQuote = () => { quote.textContent = musicQuotes[index]; };
-	byId('musicQuoteClose')?.addEventListener('click', () => { popup.hidden = true; });
-	byId('musicQuoteNext')?.addEventListener('click', () => {
+	const counter = byId('musicQuoteCount');
+	const renderQuote = () => {
+		quote.textContent = window.MWLocale?.translate(musicQuotes[index]) || musicQuotes[index];
+		if (counter) counter.textContent = `${String(index + 1).padStart(2, '0')} / ${musicQuotes.length}`;
+	};
+	popup.addEventListener('mouseenter', () => window.clearInterval(musicQuoteTimer));
+	popup.addEventListener('mouseleave', startMusicQuoteRotation);
+	popup.addEventListener('focusin', () => window.clearInterval(musicQuoteTimer));
+	popup.addEventListener('focusout', (event) => {
+		if (!popup.contains(event.relatedTarget)) startMusicQuoteRotation();
+	});
+	byId('musicQuoteClose')?.addEventListener('click', () => {
+		popup.hidden = true;
+		window.clearInterval(musicQuoteTimer);
+		musicQuoteTimer = null;
+	});
+	advanceMusicQuote = () => {
 		index = (index + 1) % musicQuotes.length;
 		renderQuote();
-	});
+	};
+	byId('musicQuoteNext')?.addEventListener('click', advanceMusicQuote);
 	renderQuote();
 }
+
+function startMusicQuoteRotation() {
+	const popup = byId('musicQuotePopup');
+	if (!popup || popup.hidden || document.hidden || popup.matches(':hover') || popup.contains(document.activeElement)) return;
+	window.clearInterval(musicQuoteTimer);
+	musicQuoteTimer = window.setInterval(advanceMusicQuote, 12_000);
+}
+
+document.addEventListener('visibilitychange', () => {
+	if (document.hidden) {
+		window.clearInterval(musicQuoteTimer);
+		musicQuoteTimer = null;
+	} else {
+		activateHeroVideo();
+		startMusicQuoteRotation();
+	}
+});
 
 initializeMusicQuote();
 
@@ -515,10 +565,14 @@ function openWorkspace(user) {
 	splashProgressTimer = null;
 	if (loginView) loginView.hidden = true;
 	appView.hidden = false;
+	activateHeroVideo();
 	initializeMusicQuote();
 	window.setTimeout(() => {
 		const quotePopup = byId('musicQuotePopup');
-		if (quotePopup) quotePopup.hidden = false;
+		if (quotePopup) {
+			quotePopup.hidden = false;
+			startMusicQuoteRotation();
+		}
 	}, 900);
 	if (!loginView && byId('worldOpenLink')) byId('worldOpenLink').hidden = true;
 	history.replaceState(null, '', `${location.pathname}${location.search}`);
@@ -548,6 +602,14 @@ function openWorkspace(user) {
 	}
 	if (user.country) byId('worldCountry').textContent = `Country: ${countryFlag(user.countryCode)} ${user.country}`.trim();
 	selectDashboardTab('community');
+	const requestedCommunityTab = new URLSearchParams(location.search).get('tab');
+	if (['feed', 'gigs', 'musicians', 'listen', 'chat', 'marketplace'].includes(requestedCommunityTab)) {
+		selectCommunityTab(requestedCommunityTab);
+		if (requestedCommunityTab === 'chat') {
+			void loadChatMessages();
+			void refreshChatRoomSummaries();
+		}
+	}
 	void loadCommunity();
 	initializeWorldWidgets();
 	void prepareSigningKey();
@@ -588,6 +650,12 @@ function initializeSplashProgress() {
 	const progressTrack = byId('splashProgressTrack');
 	const announcement = byId('splashProgressAnnouncement');
 	if (!splash || !continueButton || !progress || !progressTrack) return;
+	const requestedCommunityTab = new URLSearchParams(location.search).get('tab');
+	const directCommunityTab = ['feed', 'gigs', 'musicians', 'listen', 'chat', 'marketplace'].includes(requestedCommunityTab);
+	if (location.hash === '#signin' || new URLSearchParams(location.search).get('signup') === '1' || directCommunityTab) {
+		splash.hidden = true;
+		return;
+	}
 	const duration = 30_000;
 	const startedAt = performance.now();
 	const update = () => {
@@ -631,6 +699,7 @@ function selectDashboardTab(name) {
 		const panel = byId(panelId);
 		if (panel) panel.hidden = panelId !== selectedPanel;
 	}
+	if (selectedPanel === 'community') activateHeroVideo();
 }
 
 function initials(name) {
@@ -1081,11 +1150,20 @@ function renderAdminProfile() {
 }
 
 const communityChatRooms = {
-	singers: { title: 'Singers and vocalists', icon: '🎤' },
-	instrumentalists: { title: 'Instrumentalists', icon: '🎸' },
-	marketplace: { title: 'Instrument and gear', icon: '🎹' },
-	support: { title: 'Customer service', icon: '♪' },
+	singers: { title: 'Singers and vocalists', description: 'Share your voice and ideas', icon: '🎤', prompts: ['Introduce yourself', 'What are you working on?'] },
+	instrumentalists: { title: 'Instrumentalists', description: 'Find players and collaborators', icon: '🎸', prompts: ['Introduce yourself and your instrument', 'Who would you like to collaborate with?'] },
+	marketplace: { title: 'Instrument and gear', description: 'Discuss instruments, equipment, and listings', icon: '🎹', prompts: ['What gear are you looking for?', 'Share a tip about your setup'] },
+	support: { title: 'Community support', description: 'Ask general platform questions; do not share private details', icon: '♪', prompts: ['How do I use this feature?', 'Who can help with a platform issue?'] },
 };
+
+function chatRoomStorageKey(room) {
+	const userId = Number(communityData.user?.id || currentAccount?.id);
+	return `mw-chat-read:${userId}:${room}`;
+}
+
+function isChatRoomOpen() {
+	return Boolean(appView && !appView.hidden && byId('chatTab') && !byId('chatTab').hidden);
+}
 
 function selectChatRoom(room) {
 	const selectedRoom = communityChatRooms[room];
@@ -1096,11 +1174,71 @@ function selectChatRoom(room) {
 		const selected = button.dataset.chatRoom === room;
 		button.classList.toggle('active', selected);
 		button.setAttribute('aria-pressed', String(selected));
+		const roomDetails = communityChatRooms[button.dataset.chatRoom];
+		const summary = button.querySelector('.chat-room-copy small');
+		if (summary && roomDetails) summary.textContent = window.MWLocale?.translate(roomDetails.description) || roomDetails.description;
 	}
 	const title = byId('chatRoomTitle');
-	if (title) title.textContent = selectedRoom.title;
+	if (title) title.textContent = window.MWLocale?.translate(selectedRoom.title) || selectedRoom.title;
 	const avatar = byId('chatRoomAvatar');
 	if (avatar) avatar.textContent = selectedRoom.icon;
+	const description = byId('chatRoomDescription');
+	if (description) description.textContent = window.MWLocale?.translate(selectedRoom.description) || selectedRoom.description;
+	const suggestions = byId('chatRoomSuggestions');
+	if (suggestions) {
+		suggestions.replaceChildren();
+		for (const prompt of selectedRoom.prompts) {
+			const suggestion = document.createElement('button');
+			suggestion.type = 'button';
+			suggestion.className = 'chat-room-suggestion';
+			suggestion.textContent = window.MWLocale?.translate(prompt) || prompt;
+			suggestion.addEventListener('click', () => {
+				const message = byId('chatMessageBody');
+				if (message) {
+					message.value = suggestion.textContent;
+					message.focus();
+				}
+			});
+			suggestions.append(suggestion);
+		}
+	}
+}
+
+async function refreshChatRoomSummaries(markReadRoom = '') {
+	if (!currentAccount || !byId('chatMessages')) return;
+	try {
+		const { rooms } = await request('community-room-summaries', 'GET');
+		const activeRoom = byId('chatRoomSelect')?.value;
+		for (const room of rooms) {
+			const count = Math.max(0, Number(room.message_count) || 0);
+			const key = chatRoomStorageKey(room.room);
+			const storedValue = localStorage.getItem(key);
+			const stored = storedValue === null ? count : Number(storedValue);
+			const lastRead = storedValue === null || !Number.isSafeInteger(stored) || stored < 0
+				? count
+				: markReadRoom === room.room || isChatRoomOpen() && activeRoom === room.room
+					? count
+					: Math.min(stored, count);
+			localStorage.setItem(key, String(lastRead));
+			const unread = Math.max(0, count - lastRead);
+			const badge = document.querySelector(`[data-chat-unread="${room.room}"]`);
+			const button = document.querySelector(`[data-chat-room="${room.room}"]`);
+			if (badge) {
+				badge.hidden = unread === 0;
+				badge.textContent = unread > 99 ? '99+' : String(unread);
+				badge.setAttribute('aria-label', `${unread} unread messages`);
+			}
+			if (button) {
+				button.classList.toggle('has-unread', unread > 0);
+				if (unread) button.title = `${unread} unread messages`;
+				else button.removeAttribute('title');
+			}
+		}
+		const status = byId('chatRoomStatus');
+		if (status) status.textContent = '';
+	} catch (error) {
+		showMessage('chatRoomStatus', error.message);
+	}
 }
 
 document.querySelectorAll('[data-chat-room]').forEach((button) => {
@@ -1113,7 +1251,7 @@ document.querySelectorAll('[data-chat-room]').forEach((button) => {
 async function loadChatMessages() {
 	const room = byId('chatRoomSelect')?.value;
 	const list = byId('chatMessages');
-	if (!room || !list || appView?.hidden) return;
+	if (!room || !list || appView?.hidden || !isChatRoomOpen()) return;
 	selectChatRoom(room);
 	const wasAtBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 100;
 	try {
@@ -1121,7 +1259,9 @@ async function loadChatMessages() {
 		if (byId('chatRoomSelect')?.value !== room) return;
 		list.replaceChildren();
 		if (!messages.length) {
-			addText(list, 'p', 'community-empty', 'This room is ready for its first message.');
+			const roomTitle = window.MWLocale?.translate(communityChatRooms[room].title) || communityChatRooms[room].title;
+			addText(list, 'p', 'community-empty', `Start the ${roomTitle} conversation. Share an idea or say hello.`);
+			void refreshChatRoomSummaries(room);
 			return;
 		}
 		for (const message of messages) {
@@ -1145,6 +1285,8 @@ async function loadChatMessages() {
 			list.append(item);
 		}
 		if (wasAtBottom) list.scrollTop = list.scrollHeight;
+		list.setAttribute('aria-label', `${window.MWLocale?.translate(communityChatRooms[room].title) || communityChatRooms[room].title} messages`);
+		void refreshChatRoomSummaries(room);
 	} catch (error) {
 		if (byId('chatRoomSelect')?.value !== room) return;
 		list.replaceChildren();
@@ -1402,7 +1544,13 @@ byId('trackShareForm')?.addEventListener('submit', async (event) => {
 });
 
 document.querySelectorAll('[data-community-tab]').forEach((button) => {
-	button.addEventListener('click', () => selectCommunityTab(button.dataset.communityTab));
+	button.addEventListener('click', () => {
+		selectCommunityTab(button.dataset.communityTab);
+		if (button.dataset.communityTab === 'chat') {
+			void loadChatMessages();
+			void refreshChatRoomSummaries();
+		}
+	});
 });
 byId('musicianCountryFilter')?.addEventListener('change', () => renderMusicianDirectory());
 document.querySelectorAll('[data-open-community-tab]').forEach((button) => {
@@ -1410,6 +1558,10 @@ document.querySelectorAll('[data-open-community-tab]').forEach((button) => {
 		const tab = button.dataset.openCommunityTab;
 		selectDashboardTab('community');
 		selectCommunityTab(tab);
+		if (tab === 'chat') {
+			void loadChatMessages();
+			void refreshChatRoomSummaries();
+		}
 		byId(tab === 'chat' ? 'chatTab' : 'community').scrollIntoView({ behavior: 'smooth', block: 'start' });
 	});
 });
@@ -1460,10 +1612,12 @@ byId('chatMessageForm')?.addEventListener('submit', async (event) => {
 	button.disabled = true;
 	showMessage('chatMessageStatus', '');
 	try {
-		const result = await request('community-message', 'POST', { room: byId('chatRoomSelect').value, body: byId('chatMessageBody').value.trim() });
+		const room = byId('chatRoomSelect').value;
+		const result = await request('community-message', 'POST', { room, body: byId('chatMessageBody').value.trim() });
 		byId('chatMessageForm').reset();
 		showMessage('chatMessageStatus', result.message, true);
 		await loadChatMessages();
+		await refreshChatRoomSummaries(room);
 	} catch (error) { showMessage('chatMessageStatus', error.message); }
 	finally { button.disabled = false; }
 });
@@ -2237,7 +2391,7 @@ function renderBackups(backups, remote) {
 		const row = document.createElement('tr');
 		const cell = document.createElement('td');
 		cell.colSpan = 4; cell.className = 'empty';
-		cell.textContent = 'Using remote Turso database — backups are managed by Turso.';
+		cell.textContent = 'Using a remote database — backups are managed by your database provider.';
 		row.append(cell); body.append(row);
 		return;
 	}
@@ -2333,7 +2487,8 @@ async function loadState() {
 			openWorkspace(state.user);
 		} else if (loginView) {
 			history.replaceState(null, '', '#signin');
-			setStep(state.setupRequired ? 'setup' : 'login');
+			const requestedStep = new URLSearchParams(location.search).get('signup') === '1' ? 'signup' : 'login';
+			setStep(state.setupRequired ? 'setup' : requestedStep);
 		} else location.replace(mobileMode ? '/mobile' : '/');
 	} catch (error) {
 		if (loginView) {

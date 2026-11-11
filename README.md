@@ -2,6 +2,8 @@
 
 A responsive, music-first community with a Node.js API. Signed-in musicians can publish creative ideas, post and discover upcoming gigs, build public profiles, and share playable HTTPS audio previews or public Spotify, SoundCloud, and YouTube tracks with likes and comments. The responsive dashboard includes a concert-photo carousel, concert-video picks, animated music-inspired styling, local date/time and weather, and a dark-first purple theme with a higher-contrast light option. The interface can be switched between English, Spanish, French, Portuguese, and Swahili; language selection is saved on the device and account. User-authored posts, artist names, and third-party media titles stay in their original language. Weather coordinates are sent to Open-Meteo and are not added to a musician profile. Member login email stays private from other members unless a user explicitly shares a contact address on their profile or gig listing. Only administrators can access account email, registration country, and account sign-in/sign-out history. The app also supports role-based accounts, email sign-in, and browser-held ECDSA signatures.
 
+The public community guide is available at `/info.html` and includes About, How it works, Opportunities, Community guidelines, Privacy, and searchable Help/FAQ pages. It can be opened before signing in, and its feature links take members to the matching community area after sign-in.
+
 Admins can restore deleted accounts from the Deleted accounts archive without setting a password. Restored accounts retain their archived password, and users can optionally change it in Account settings. Accounts deleted before credential archiving was added may not have a recoverable password in the archive.
 
 Users can recover an approved account with an email one-time code when that account has an email address. Set `RESEND_API_KEY` and a verified `EMAIL_FROM` to enable delivery. Recovery codes expire after 10 minutes, allow five verification attempts, and can be sent no more than once per minute or five times per hour per account. A successful recovery changes the password and invalidates existing sessions.
@@ -46,7 +48,7 @@ In VS Code, press **F5** and select **Live app on port 8001**. This avoids a sta
 
 ## Expo mobile app
 
-The Expo Android/iOS app is maintained separately in the sibling `Musicians World Mobile` folder, outside this website project. It opens the deployed website and uses the same sign-in flow and API. Configure `EXPO_PUBLIC_SITE_URL` in that project's `.env` for local use or its EAS environment for release builds. Backend credentials such as the Turso token and pepper must stay on the server and must not be added to Expo environment variables.
+The Expo Android/iOS app is maintained separately in the sibling `Musicians World Mobile` folder, outside this website project. It opens the deployed website and uses the same sign-in flow and API. Configure `EXPO_PUBLIC_SITE_URL` in that project's `.env` for local use or its EAS environment for release builds. Backend credentials such as the PostgreSQL URL and pepper must stay on the server and must not be added to Expo environment variables.
 
 The browser-based mobile sign-in page is available at `/mobile`. It shares the same account setup, password recovery, Google sign-in, and API as the desktop page; after sign-in it opens the responsive musician dashboard. New viewer requests include a required country selection, saved with the account and shown to administrators in pending approvals, the account directory, and directory exports. Existing accounts without a submitted country remain marked as not provided.
 
@@ -54,34 +56,33 @@ The community hero opens with a muted Pexels gospel concert clip, a typing-effec
 
 ## Deploy on Vercel
 
-This repository uses Vercel to serve the static files and run `api/index.js` as the `/api` Node.js Function. The local `server.js` is for Laragon and local development. Vercel Functions have a read-only filesystem, so configure Turso for persistent production accounts; do not use local SQLite for Vercel production data.
+This repository uses Vercel to serve the static files and run `api/index.js` as the `/api` Node.js Function. The local `server.js` is for Laragon and local development. Vercel Functions have a read-only filesystem, so configure a managed PostgreSQL database for persistent production accounts; do not use local SQLite for Vercel production data. Neon is one provider to consider for a free-to-start PostgreSQL database; check its current limits and terms before launch.
 
 1. Push this project to GitHub and import that repository in Vercel. Set the project root to the repository root. Select the **Other** framework preset; leave the build command empty because the frontend is static and the API is built from `api/index.js`.
-2. Create a Turso database and add these in Vercel **Settings > Environment Variables** for Production (and Preview if needed):
+2. Create a PostgreSQL database with a provider such as Neon. Copy its pooled PostgreSQL connection string and add these in Vercel **Settings > Environment Variables** for Production (and Preview if needed):
 
    ```text
    NODE_ENV=production
-   DATABASE_MODE=turso
-   TURSO_DATABASE_URL=libsql://your-database.turso.io
-   TURSO_AUTH_TOKEN=your-private-database-token
+   DATABASE_MODE=postgres
+   DATABASE_URL=postgresql://user:password@host/database?sslmode=require
    AUTH_PEPPER=your-stable-random-secret-at-least-32-characters
    ```
 
-   Generate a new pepper locally with `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"`. Save it as a Vercel secret and keep the exact same value for future deployments. Never use `.local-data` or a Vercel function's local filesystem for production accounts.
+   Use the provider's actual connection string; don't paste the example literally. Generate a new pepper locally with `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"`. Save it as a Vercel secret and keep the exact same value for future deployments. Never use `.local-data` or a Vercel function's local filesystem for production accounts.
 3. If using email approval, also configure `RESEND_API_KEY`, a Resend-verified `EMAIL_FROM`, and `ADMIN_EMAIL`. Set `APP_URL` to the production URL, for example `https://your-project.vercel.app`. Email credentials and database tokens belong in Vercel Environment Variables, not in the repository.
 4. Deploy. The static website is served from the project root; API calls go to `/api`. On the first visit, create the initial administrator account.
 5. If using Google sign-in, set `GOOGLE_CLIENT_ID` and add the exact Vercel origin to the Google OAuth client's authorized JavaScript origins.
 
-Turso provides the persistent remote database. The local AES-encrypted SQLite backup job does not run for Turso; use Turso's database backup and restore features. Vercel automatically detects the Node.js API function in the root `api` directory.
+The PostgreSQL provider manages the remote database. Configure its backup and restore features. Vercel automatically detects the Node.js API function in the root `api` directory.
 ## Deploy on Render
 
-The repository includes a Render Blueprint in `render.yaml` that runs the app with SQLite on a 1 GB persistent disk—no Turso account or database credentials needed. In Render, choose **New > Blueprint**, connect this GitHub repository, and select the Blueprint. It runs `npm ci`, starts with `npm start`, and checks `/healthz`. The Blueprint mounts persistent storage at `/var/data`, sets `AUTH_DATA_DIR=/var/data`, and creates the SQLite database and private pepper there automatically. Persistent disks require a paid Render web service; the Blueprint selects the Starter plan. Keep the disk attached and do not change its mount path. Set `RESEND_API_KEY` and `EMAIL_FROM` to enable email; set `ADMIN_EMAIL` for admin notifications if the admin account does not already have an email address. Render's `RENDER_EXTERNAL_URL` supplies approval links automatically; set `APP_URL` only when using a custom domain.
+The repository includes a Render Blueprint in `render.yaml` that runs the app with SQLite on a 1 GB persistent disk. In Render, choose **New > Blueprint**, connect this GitHub repository, and select the Blueprint. It runs `npm ci`, starts with `npm start`, and checks `/healthz`. The Blueprint mounts persistent storage at `/var/data`, sets `AUTH_DATA_DIR=/var/data`, and creates the SQLite database and private pepper there automatically. Persistent disks require a paid Render web service; the Blueprint selects the Starter plan. Keep the disk attached and do not change its mount path. Set `RESEND_API_KEY` and `EMAIL_FROM` to enable email; set `ADMIN_EMAIL` for admin notifications if the admin account does not already have an email address. Render's `RENDER_EXTERNAL_URL` supplies approval links automatically; set `APP_URL` only when using a custom domain.
 
 For signup and approval emails, configure `RESEND_API_KEY` and `EMAIL_FROM` in Render's Environment settings. Set `ADMIN_EMAIL` for admin notifications if the admin account does not already have an email address, and set `APP_URL` only to override the automatic Render URL. Keep secrets out of the repository. Verify the sender domain with Resend; the sender address must belong to that verified domain.
 
 ## Deploy to your chosen hosting provider
 
-This is a standard Node.js web app. Choose a host that can run a long-lived Node.js process and provide persistent storage for SQLite, or configure Turso as a remote database. The included `server.js` serves the website and API together.
+This is a standard Node.js web app. Choose a host that can run a long-lived Node.js process and provide persistent storage for SQLite, or configure managed PostgreSQL as a remote database. The included `server.js` serves the website and API together.
 
 1. Install Node.js 20 or later and run `npm install` in the project directory.
 2. Configure the environment variables below in your host's private settings.
@@ -92,17 +93,9 @@ This is a standard Node.js web app. Choose a host that can run a long-lived Node
 
 For local SQLite, set `AUTH_DATA_DIR` to a persistent directory on the host. The database, pepper key, backup encryption key, and encrypted daily backups are stored there. Keep this directory across restarts and deployments. Local SQLite is intended for a single app instance; use a shared remote database if you run multiple instances.
 
-For SQLite on Render, the included Blueprint sets `DATABASE_MODE=sqlite` and `AUTH_DATA_DIR=/var/data` on a persistent disk. SQLite creates its pepper key and database in this directory, so no Turso account, token, or separate `AUTH_PEPPER` setting is required. Preserve the disk across restarts and deployments. To connect Turso instead, set `DATABASE_MODE=turso`, `TURSO_DATABASE_URL`, and `TURSO_AUTH_TOKEN`, and configure a stable `AUTH_PEPPER` secret. Production SQLite on any host requires `AUTH_DATA_DIR` to point to explicitly configured persistent storage.
+For SQLite on Render, the included Blueprint sets `DATABASE_MODE=sqlite` and `AUTH_DATA_DIR=/var/data` on a persistent disk. SQLite creates its pepper key and database in this directory, so no separate `AUTH_PEPPER` setting is required. Preserve the disk across restarts and deployments. To use PostgreSQL instead, set `DATABASE_MODE=postgres`, `DATABASE_URL`, and a stable `AUTH_PEPPER` secret. Production SQLite on any host requires `AUTH_DATA_DIR` to point to explicitly configured persistent storage.
 
-For a new database, generate a pepper locally with `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"` and save the output in the host's secret settings as `AUTH_PEPPER`. Do not commit it or share it in chat. Create a Turso database, get its database URL and auth token, and add them as `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN`. Set `NODE_ENV=production` in the host environment.
-
-To migrate existing local accounts to an empty Turso database, install dependencies locally, configure the two Turso variables (for example in a private `.env.local` file), and run:
-
-```powershell
-npm.cmd run migrate:turso
-```
-
-The migration copies account hashes, roles, email addresses, signing public keys, and related account fields. It refuses to run if the remote `users` table is not empty. It does not copy browser-held private signing keys. Keep `.env.local` private.
+For a new PostgreSQL database, set `DATABASE_MODE=postgres`, add the provider's PostgreSQL connection string as `DATABASE_URL`, and generate a stable pepper locally with `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"`. Save the output in the host's secret settings as `AUTH_PEPPER`. Do not commit or share either secret. On first startup, the app creates its PostgreSQL tables automatically. Existing local SQLite or previous hosted database records are not copied automatically.
 
 ## Email and administrator approval
 
@@ -129,7 +122,7 @@ GOOGLE_CLIENT_ID=your-web-client-id.apps.googleusercontent.com
 
 The Google button appears only when this value is configured. Google verifies the identity token on the server. A first-time Google sign-in creates a pending viewer request, emails the verified Google address and administrator, and cannot access the app until approved. Returning approved Google users sign in normally. Google sign-in will not automatically link to an existing account with the same email; contact the administrator to avoid taking over or duplicating an account. Configure Resend as above to deliver signup and approval emails.
 
-Turso Cloud provides continuous backups and point-in-time restore; the retention window depends on the current plan. For local SQLite, the app automatically snapshots the database when opened, after database changes, and every 24 hours while the server is running. It keeps the latest daily encrypted database and pepper snapshots for seven days under the `backups` folder inside `AUTH_DATA_DIR`.
+The managed PostgreSQL provider handles remote database backups according to its plan and settings. For local SQLite, the app automatically snapshots the database when opened, after database changes, and every 24 hours while the server is running. It keeps the latest daily encrypted database and pepper snapshots for seven days under the `backups` folder inside `AUTH_DATA_DIR`.
 
 Local snapshot files use AES-256-GCM authenticated encryption with a fresh random nonce per file. The 32-byte encryption key is generated once at `AUTH_DATA_DIR/backup.key`; keep that key safe and separate from copied backup files. You can instead set `BACKUP_ENCRYPTION_KEY` to a 32-byte key encoded as 64 hex characters or base64url. Keep the same key to decrypt old backups. To restore, preserve that key (or set the same environment key), then run this with the backup's date:
 
@@ -144,7 +137,7 @@ The restore command checks SQLite integrity and writes the restored database and
 - Passwords are pre-hashed with HMAC-SHA-256 using a server-side pepper, then hashed with bcrypt cost 12. Older bcrypt hashes are upgraded after a successful sign-in.
 - Session cookies are authenticated with HMAC-SHA-256 using a session key derived with HKDF; cookie signatures are compared in constant time.
 - Signed statements use ECDSA P-256 with SHA-256 through the browser Web Crypto API. Private signing keys stay in browser IndexedDB; the server stores public keys.
-- Local automatic backups use AES-256-GCM, which encrypts backup contents and detects tampering. Turso Cloud manages backups and point-in-time restore for remote databases.
+- Local automatic backups use AES-256-GCM, which encrypts backup contents and detects tampering. Remote PostgreSQL backups and restore are managed by the configured database provider.
 
 ## Existing local data
 

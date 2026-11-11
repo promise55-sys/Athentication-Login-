@@ -11,9 +11,11 @@ const DEVELOPMENT = process.env.NODE_ENV !== 'production';
 const assets = new Map([
 	['/index.html', ['index.html', 'text/html; charset=utf-8']],
 	['/world.html', ['world.html', 'text/html; charset=utf-8']],
+	['/info.html', ['info.html', 'text/html; charset=utf-8']],
 	['/style.css', ['style.css', 'text/css; charset=utf-8']],
 	['/app.js', ['app.js', 'text/javascript; charset=utf-8']],
 	['/translations.js', ['translations.js', 'text/javascript; charset=utf-8']],
+	['/guide.js', ['guide.js', 'text/javascript; charset=utf-8']],
 	['/mobile', [path.join('mobile', 'index.html'), 'text/html; charset=utf-8']],
 	['/mobile/', [path.join('mobile', 'index.html'), 'text/html; charset=utf-8']],
 	['/mobile/index.html', [path.join('mobile', 'index.html'), 'text/html; charset=utf-8']],
